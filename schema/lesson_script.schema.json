@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LessonScript",
+  "description": "The contract between Claude (writer), the voice service (adds audio), and the Android app (renders). Claude never makes video: it writes this JSON. Coordinates are normalised 0..1 (x right, y down) on a 16:9 board.",
+  "type": "object",
+  "required": ["question_id", "title", "steps"],
+  "properties": {
+    "version": {"type": "integer", "const": 1},
+    "question_id": {"type": "string"},
+    "title": {"type": "string"},
+    "language": {"type": "string", "enum": ["hinglish", "hindi", "english"]},
+    "trick_id": {"type": "string"},
+    "estimated_seconds": {"type": "integer", "minimum": 0},
+    "works_when": {"type": "string"},
+    "answer": {"type": "string"},
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "say"],
+        "properties": {
+          "id": {"type": "string"},
+          "say": {"type": "string", "description": "What the teacher speaks in this step."},
+          "pause_ms": {"type": "integer", "minimum": 0},
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type"],
+              "properties": {
+                "type": {"enum": ["write", "line", "arrow", "circle", "box", "underline", "brace", "highlight", "clear"]},
+                "text": {"type": "string"},
+                "x": {"type": "number"}, "y": {"type": "number"},
+                "x2": {"type": "number"}, "y2": {"type": "number"},
+                "r": {"type": "number"},
+                "size": {"enum": ["s", "m", "l"]},
+                "color": {"enum": ["white", "yellow", "green", "red", "blue"]}
+              }
+            }
+          },
+          "audio_url": {"type": ["string", "null"], "description": "Added by the voice service."},
+          "alignment": {
+            "type": ["object", "null"],
+            "description": "Character timings from the TTS provider, used for lip sync.",
+            "properties": {
+              "chars": {"type": "array", "items": {"type": "string"}},
+              "start": {"type": "array", "items": {"type": "number"}},
+              "end": {"type": "array", "items": {"type": "number"}}
+            }
+          }
+        }
+      }
+    }
+  }
+}

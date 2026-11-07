@@ -1,0 +1,132 @@
+subject: arithmetic
+tricks:
+  - id: ari-percent-fraction-table
+    name: "Percentage-fraction table"
+    subject: arithmetic
+    topic: percentage fractions
+    exams: [SSC CGL, SSC CHSL, Banking, Railway]
+    triggers: ["percent", "%", "increased by", "decreased by"]
+    when: "Any percentage question where the percentage is 1/n for small n."
+    idea: "Memorise 1/2=50, 1/3=33.33, 1/4=25, 1/5=20, 1/6=16.67, 1/7=14.28, 1/8=12.5, 1/9=11.11, 1/11=9.09, 1/12=8.33. Convert percentage to a fraction and multiply."
+    steps: ["Convert the percentage to a fraction from the table.", "Multiply or divide the base by the fraction's numerator and denominator."]
+    example: {question: "What is 16.67% of 360?", answer: "60", seconds: 5}
+    speed_seconds: 5
+
+  - id: ari-percent-more-less
+    name: "x% more means 100x/(100+x)% less"
+    subject: arithmetic
+    topic: percentage comparison
+    exams: [SSC CGL, SSC CHSL, Banking]
+    triggers: ["more than", "less than", "% more", "% less"]
+    when: "A is x% more than B and you are asked how much less B is than A."
+    idea: "Reverse percentage = 100x/(100+x). Use the fraction trick: x% = 1/n gives 1/(n+1)."
+    steps: ["Write x% as a fraction 1/n.", "The reverse is 1/(n+1) as a percentage."]
+    example: {question: "A is 25% more than B. B is what % less than A?", answer: "20%", seconds: 6}
+    speed_seconds: 6
+    proof: {kind: identity, vars: [B, x], lhs: "(B*(1 + x/100) - B)/(B*(1 + x/100))*100", rhs: "100*x/(100 + x)"}
+
+  - id: ari-successive-change
+    name: "Successive percentage change a+b+ab/100"
+    subject: arithmetic
+    topic: successive discount percentage
+    exams: [SSC CGL, SSC CHSL, Banking, Railway]
+    triggers: ["successive", "two discounts", "followed by", "discount of"]
+    when: "Two or more percentage changes or discounts applied one after another."
+    idea: "Net = a + b + ab/100. Use minus signs for decreases or discounts."
+    steps: ["Write each change with sign (+ for increase, − for decrease).", "Net = a + b + ab/100."]
+    example: {question: "Successive discounts of 20% and 10%. Net discount?", answer: "28%", seconds: 8}
+    speed_seconds: 8
+    proof: {kind: identity, vars: [a, b], lhs: "((1 + a/100)*(1 + b/100) - 1)*100", rhs: "a + b + a*b/100"}
+
+  - id: ari-same-sp-loss
+    name: "Same selling price, p% gain and p% loss"
+    subject: arithmetic
+    topic: profit loss
+    exams: [SSC CGL, SSC CHSL, Banking]
+    triggers: ["profit", "loss", "selling price", "cost price", "gain"]
+    when: "Two articles sold at the same price, one at p% profit, one at p% loss (or two equal changes)."
+    idea: "There is always a loss of p²/100 percent overall."
+    steps: ["Spot equal gain and loss percentage.", "Loss % = p²/100."]
+    example: {question: "Two items sold at the same price, one at 10% gain and one at 10% loss.", answer: "1% loss", seconds: 5}
+    caution: "Only when both selling prices are equal."
+    speed_seconds: 5
+    proof: {kind: identity, vars: [S, p], lhs: "(2*S/(1 - (p/100)**2) - 2*S)/(2*S/(1 - (p/100)**2))*100", rhs: "p**2/100"}
+
+  - id: ari-ci-si-difference
+    name: "CI minus SI for 2 years = P(r/100)²"
+    subject: arithmetic
+    topic: compound interest simple interest
+    exams: [SSC CGL, SSC CHSL, Banking]
+    triggers: ["compound interest", "simple interest", "difference between", "ci and si"]
+    when: "The difference between compound and simple interest for 2 years is given or asked."
+    idea: "Difference = P(r/100)². For 3 years it is P(r/100)²(3 + r/100)."
+    steps: ["Use the 2-year difference formula directly.", "Solve for P or r with the given difference."]
+    example: {question: "CI−SI on a sum for 2 years at 10% is ₹50. Find the sum.", answer: "₹5000", seconds: 10}
+    speed_seconds: 10
+    proof: {kind: identity, vars: [P, r], lhs: "P*(1 + r/100)**2 - P - P*2*r/100", rhs: "P*(r/100)**2"}
+
+  - id: ari-average-speed-equal-distance
+    name: "Average speed for equal distances"
+    subject: arithmetic
+    topic: speed distance time average
+    exams: [SSC CGL, SSC CHSL, Railway, Banking]
+    triggers: ["average speed", "to and fro", "return journey", "same distance"]
+    when: "Equal distances travelled at two different speeds."
+    idea: "Average speed = 2ab/(a+b), never (a+b)/2."
+    steps: ["Identify that the two distances are equal.", "Apply 2ab/(a+b)."]
+    example: {question: "Goes at 40 km/h, returns at 60 km/h. Average speed?", answer: "48 km/h", seconds: 6}
+    caution: "Only for equal distances. For equal times use (a+b)/2."
+    speed_seconds: 6
+    proof: {kind: identity, vars: [a, b, d], lhs: "2*d/(d/a + d/b)", rhs: "2*a*b/(a + b)"}
+
+  - id: ari-trains-relative-speed
+    name: "Trains: add or subtract speeds, 5/18 for units"
+    subject: arithmetic
+    topic: trains relative speed
+    exams: [SSC CGL, SSC CHSL, Railway]
+    triggers: ["train", "platform", "crosses", "opposite direction", "same direction"]
+    when: "Two trains cross each other, or a train crosses a pole or platform."
+    idea: "Time = total length / relative speed. Opposite directions add, same direction subtract. km/h to m/s is ×5/18."
+    steps: ["Convert km/h to m/s with ×5/18.", "Add speeds (opposite) or subtract (same).", "Divide the sum of lengths by the relative speed."]
+    example: {question: "36 km/h = ? m/s", answer: "10", seconds: 3}
+    speed_seconds: 10
+    proof: {kind: numeric, expr: "36*5/18", expected: "10"}
+
+  - id: ari-alligation
+    name: "Alligation cross method"
+    subject: arithmetic
+    topic: mixture alligation
+    exams: [SSC CGL, SSC CHSL, Banking]
+    triggers: ["mixture", "mixed", "alligation", "per kg", "milk and water", "price of the mixture"]
+    when: "Two ingredients mixed to get a given mean value (price, concentration, speed)."
+    idea: "Cheaper : dearer = (dearer − mean) : (mean − cheaper)."
+    steps: ["Write cheaper and dearer on the left, mean in the middle.", "Subtract diagonally to get the ratio."]
+    example: {question: "Rice at ₹20 and ₹30 per kg mixed to get ₹24 per kg. Ratio?", answer: "3:2", seconds: 8}
+    speed_seconds: 8
+    proof: {kind: identity, vars: [c, d, m], lhs: "(c*(d - m) + d*(m - c))/((d - m) + (m - c))", rhs: "m"}
+
+  - id: ari-time-work-lcm
+    name: "Time and work: assume total work = LCM"
+    subject: arithmetic
+    topic: time work pipes
+    exams: [SSC CGL, SSC CHSL, Banking, Railway]
+    triggers: ["work", "days", "pipe", "tank", "together", "alone"]
+    when: "Two or three people or pipes working alone and together."
+    idea: "Take total work as the LCM of the days. Efficiency = work/days. Add efficiencies, divide the work."
+    steps: ["Take the LCM of the given days as total work.", "Efficiency of each = LCM/days.", "Combined days = LCM / total efficiency."]
+    example: {question: "A: 12 days, B: 18 days. Together?", answer: "7.2 days", seconds: 12}
+    speed_seconds: 12
+    proof: {kind: numeric, expr: "lcm(12,18)/(lcm(12,18)/12 + lcm(12,18)/18)", expected: "36/5"}
+
+  - id: ari-option-backsolve
+    family: option_elimination
+    name: "Option back-solving (arithmetic)"
+    subject: arithmetic
+    topic: options back substitution
+    exams: [SSC CGL, SSC CHSL, Banking, Railway]
+    triggers: ["find the", "what is the", "how many", "how much"]
+    when: "Options are numbers and the story can be checked quickly."
+    idea: "Test the middle option, then move up or down."
+    steps: ["Take the middle option.", "Run the story forward and compare with the given result.", "Move up or down."]
+    example: {question: "Age problems with 4 numeric options", answer: "test options", seconds: 20}
+    speed_seconds: 20

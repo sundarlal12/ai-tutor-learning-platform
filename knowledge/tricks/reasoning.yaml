@@ -1,0 +1,106 @@
+subject: reasoning
+tricks:
+  - id: rea-clock-angle
+    name: "Clock angle |30H − 5.5M|"
+    subject: reasoning
+    topic: clock angle hands
+    exams: [SSC CGL, SSC CHSL, Railway, Banking]
+    triggers: ["clock", "angle between the hands", "hour hand", "minute hand"]
+    when: "Angle between clock hands at H hours M minutes."
+    idea: "Angle = |30H − 5.5M|. If it exceeds 180° subtract from 360°."
+    steps: ["Plug H and M.", "Take the absolute value; use 360 minus it if above 180."]
+    example: {question: "Angle at 7:20", answer: "100°", seconds: 6}
+    speed_seconds: 6
+    proof: {kind: numeric, expr: "Abs(30*7 - 5.5*20)", expected: "100"}
+
+  - id: rea-handshakes
+    name: "Handshakes n(n−1)/2"
+    subject: reasoning
+    topic: combinations handshakes matches
+    exams: [SSC CGL, SSC CHSL, Railway, Banking]
+    triggers: ["handshake", "shake hands", "matches are played", "each other", "round robin"]
+    when: "Everyone meets everyone else exactly once."
+    idea: "Total = n(n−1)/2. If each pair meets twice, use n(n−1)."
+    steps: ["Count n.", "n(n−1)/2."]
+    example: {question: "10 people shake hands once each.", answer: "45", seconds: 4}
+    speed_seconds: 4
+    proof: {kind: numeric, expr: "10*9/2", expected: "45"}
+
+  - id: rea-rank-total
+    name: "Total = top rank + bottom rank − 1"
+    subject: reasoning
+    topic: ranking order
+    exams: [SSC CGL, SSC CHSL, Railway, Banking]
+    triggers: ["rank", "from the top", "from the bottom", "from the left", "from the right", "total number of students"]
+    when: "A person's rank from both ends is given."
+    idea: "Total = rank from one end + rank from the other end − 1."
+    steps: ["Add both ranks.", "Subtract 1."]
+    example: {question: "Rank 10 from the top and 15 from the bottom. Total?", answer: "24", seconds: 3}
+    speed_seconds: 3
+    proof: {kind: numeric, expr: "10 + 15 - 1", expected: "24"}
+
+  - id: rea-direction-pythagoras
+    name: "Direction sense with Pythagoras"
+    subject: reasoning
+    topic: direction distance
+    exams: [SSC CGL, SSC CHSL, Railway]
+    triggers: ["north", "south", "east", "west", "direction", "turned"]
+    when: "Walking in perpendicular directions, then asked distance from the start."
+    idea: "Net east-west and net north-south form a right triangle; use triples (3-4-5, 5-12-13)."
+    steps: ["Cancel opposite directions.", "Net legs form a right triangle.", "Use a Pythagoras triple."]
+    example: {question: "3 km east then 4 km north. Distance from start?", answer: "5 km", seconds: 5}
+    speed_seconds: 5
+    proof: {kind: numeric, expr: "sqrt(3**2 + 4**2)", expected: "5"}
+
+  - id: rea-coding-opposite-letter
+    name: "Opposite letter = 27 − position"
+    subject: reasoning
+    topic: coding decoding letters alphabet
+    exams: [SSC CGL, SSC CHSL, Railway, Banking]
+    triggers: ["coding", "code", "letters", "alphabet", "opposite letter", "mirror"]
+    when: "Alphabet position or mirror-letter coding."
+    idea: "A=1 … Z=26. The opposite letter of position p is 27 − p. Memorise EJOTY (5,10,15,20,25)."
+    steps: ["Convert letters to positions.", "Apply the pattern on numbers.", "Convert back."]
+    example: {question: "Opposite letter of F", answer: "U", seconds: 3}
+    speed_seconds: 3
+    proof: {kind: numeric, expr: "27 - 6", expected: "21"}
+
+  - id: rea-calendar-odd-days
+    name: "Odd days for calendar questions"
+    subject: reasoning
+    topic: calendar days odd
+    exams: [SSC CGL, SSC CHSL, Railway]
+    triggers: ["calendar", "day of the week", "which day", "leap year", "january 1"]
+    when: "Day of the week for a given date."
+    idea: "100 years = 5 odd days, 200 = 3, 300 = 1, 400 = 0. An ordinary year has 1 odd day, a leap year 2."
+    steps: ["Split the years into centuries and the rest.", "Add odd days and take mod 7.", "Count from Sunday."]
+    example: {question: "Odd days in 100 years", answer: "5", seconds: 6}
+    speed_seconds: 8
+    proof: {kind: numeric, expr: "Mod(76*1 + 24*2, 7)", expected: "5"}
+
+  - id: rea-blood-relation-tree
+    family: diagram
+    name: "Blood relations: draw a tree with signs"
+    subject: reasoning
+    topic: blood relation family
+    exams: [SSC CGL, SSC CHSL, Railway, Banking]
+    triggers: ["father", "mother", "son", "daughter", "brother", "sister", "uncle", "pointing to"]
+    when: "A chain of family relations."
+    idea: "Draw a family tree: squares for males, circles for females, '=' for married, vertical lines for children. Start from the speaker and move one relation at a time."
+    steps: ["Mark the speaker.", "Add one relation at a time.", "Read the final relation off the tree."]
+    example: {question: "Pointing to a man, Sita says, 'His mother is the only daughter of my mother.' How is he related to Sita?", answer: "Son", seconds: 15}
+    speed_seconds: 15
+
+  - id: rea-series-difference-ladder
+    family: pattern
+    name: "Number series: difference ladder"
+    subject: reasoning
+    topic: number series pattern missing
+    exams: [SSC CGL, SSC CHSL, Railway, Banking]
+    triggers: ["series", "missing number", "next term", "find the wrong"]
+    when: "A number series with a missing or wrong term."
+    idea: "Take first differences; if not constant take second differences. Also test ×n±k, squares, cubes and primes."
+    steps: ["Write the differences.", "Write the differences of differences.", "Test squares and cubes if the ladder fails."]
+    example: {question: "2, 6, 12, 20, 30, ?", answer: "42", seconds: 8}
+    speed_seconds: 8
+    proof: {kind: numeric, expr: "6*7", expected: "42"}

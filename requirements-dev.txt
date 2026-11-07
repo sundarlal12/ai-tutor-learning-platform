@@ -1,0 +1,9 @@
+# Local (no Docker) development: pip install -r requirements-dev.txt
+-e ./libs/lessonkit
+fastapi
+uvicorn[standard]
+httpx
+anthropic
+websockets
+pytest
+sarvamai

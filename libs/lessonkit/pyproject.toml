@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lessonkit"
+version = "0.1.0"
+description = "Shared lesson-script models and knowledge-base loader for ExamTricks services"
+requires-python = ">=3.10"
+dependencies = ["pydantic>=2", "pyyaml", "sympy"]
+
+[tool.setuptools.packages.find]
+include = ["lessonkit*"]

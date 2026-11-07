@@ -1,0 +1,50 @@
+name: examtricks
+
+x-env: &env
+  env_file: [.env]
+
+services:
+  gateway:
+    build: {context: ., dockerfile: services/gateway/Dockerfile}
+    <<: *env
+    environment: {GENERATOR_URL: "http://generator:8001"}
+    ports: ["8000:8000"]
+    volumes: ["gateway-data:/srv/data"]
+    depends_on: [generator]
+
+  generator:
+    build: {context: ., dockerfile: services/generator/Dockerfile}
+    <<: *env
+    environment:
+      VERIFIER_URL: "http://verifier:8002"
+      VOICE_URL: "http://voice:8003"
+    depends_on: [verifier, voice]
+
+  verifier:
+    build: {context: ., dockerfile: services/verifier/Dockerfile}
+    # No ports published: only other services call it.
+    expose: ["8002"]
+
+  voice:
+    build: {context: ., dockerfile: services/voice/Dockerfile}
+    <<: *env
+    environment: {PUBLIC_BASE_URL: "${VOICE_PUBLIC_URL:-http://localhost:8003}"}
+    ports: ["8003:8003"]          # the phone downloads audio from here
+    volumes: ["voice-media:/srv/media"]
+
+  doubt:
+    build: {context: ., dockerfile: services/doubt/Dockerfile}
+    <<: *env
+    environment:
+      VERIFIER_URL: "http://verifier:8002"
+      VOICE_URL: "http://voice:8003"
+    ports: ["8004:8004"]          # websocket for raise-hand
+    depends_on: [verifier, voice]
+
+  postgres:                      # production store; the dev gateway uses files (see db/init.sql)
+    image: postgres:16-alpine
+    profiles: ["prod"]
+    environment: {POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-me}", POSTGRES_DB: examtricks}
+    volumes: ["pgdata:/var/lib/postgresql/data", "./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+
+volumes: {gateway-data: {}, voice-media: {}, pgdata: {}}

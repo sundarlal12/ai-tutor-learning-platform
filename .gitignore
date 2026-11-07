@@ -1,0 +1,12 @@
+# python caches / local state
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+.run/
+.env
+
+# local runtime media (regenerated audio, never committed)
+media/
+.DS_Store
