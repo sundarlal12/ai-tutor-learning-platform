@@ -4,7 +4,6 @@ COPY libs/lessonkit /libs/lessonkit
 RUN pip install --no-cache-dir /libs/lessonkit fastapi "uvicorn[standard]" httpx
 COPY services/gateway/app /srv/app
 COPY sample /sample
-RUN useradd -r app && mkdir -p /srv/data/bundles && chown -R app /srv
-USER app
+RUN mkdir -p /srv/data/bundles
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

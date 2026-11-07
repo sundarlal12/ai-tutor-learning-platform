@@ -189,17 +189,22 @@ async def tts(req: TtsRequest) -> TtsResponse:
 
 
 class VoiceLessonRequest(LessonScript):
-    speaker: str | None = None
-    language: str | None = None
-    pace: float | None = None
+    # Named voice_* (not speaker/language/pace) because LessonScript already has its own
+    # `language` field meaning narration style (hinglish/hindi/english) — reusing that name here
+    # silently shadowed it, so every lesson's own "language":"hinglish" was overriding the Sarvam
+    # language_code default and getting sent straight to the provider as an invalid code.
+    voice_speaker: str | None = None
+    voice_language: str | None = None
+    voice_pace: float | None = None
 
 
 @app.post("/lesson", response_model=LessonScript)
 async def voice_lesson(req: VoiceLessonRequest) -> LessonScript:
     """Adds audio_url + alignment to every step of a lesson (steps are synthesised in parallel)."""
     results = await asyncio.gather(
-        *[synthesize(s.say, speaker=req.speaker, language=req.language, pace=req.pace) for s in req.steps])
-    lesson = LessonScript(**req.model_dump(exclude={"speaker", "language", "pace"}))
+        *[synthesize(s.say, speaker=req.voice_speaker, language=req.voice_language, pace=req.voice_pace)
+          for s in req.steps])
+    lesson = LessonScript(**req.model_dump(exclude={"voice_speaker", "voice_language", "voice_pace"}))
     for step, res in zip(lesson.steps, results):
         step.audio_url, step.alignment = res.audio_url, res.alignment
     return lesson

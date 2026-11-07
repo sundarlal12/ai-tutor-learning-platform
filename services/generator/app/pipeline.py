@@ -68,9 +68,13 @@ async def _resolve_teacher(teacher_id: str | None) -> Teacher | None:
 
 
 def _voice_payload(lesson: LessonScript, teacher: Teacher | None) -> dict:
+    # voice_* names (not speaker/language/pace): LessonScript already has its own `language`
+    # field (narration style), so reusing that name on the wire would shadow it on the voice
+    # service's side — see the matching comment in services/voice/app/main.py.
     payload = lesson.model_dump(mode="json")
     if teacher:
-        payload.update(speaker=teacher.sarvam_speaker, language=teacher.sarvam_language, pace=teacher.sarvam_pace)
+        payload.update(voice_speaker=teacher.sarvam_speaker, voice_language=teacher.sarvam_language,
+                       voice_pace=teacher.sarvam_pace)
     return payload
 
 
