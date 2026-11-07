@@ -33,11 +33,25 @@ class LessonStep(BaseModel):
     alignment: Optional[Alignment] = None
 
 
+Language = Literal[
+    "hinglish", "hindi", "english", "bengali", "gujarati", "kannada", "malayalam",
+    "marathi", "odia", "punjabi", "tamil", "telugu",
+]
+
+# Narration language -> Sarvam bulbul:v3 language_code. "hinglish" speaks like Hindi (the Roman-
+# script mixed style is a *writing* choice for `say` text, not a different TTS voice).
+LANGUAGE_TO_SARVAM = {
+    "hinglish": "hi-IN", "hindi": "hi-IN", "english": "en-IN", "bengali": "bn-IN",
+    "gujarati": "gu-IN", "kannada": "kn-IN", "malayalam": "ml-IN", "marathi": "mr-IN",
+    "odia": "od-IN", "punjabi": "pa-IN", "tamil": "ta-IN", "telugu": "te-IN",
+}
+
+
 class LessonScript(BaseModel):
     version: int = 1
     question_id: str
     title: str
-    language: Literal["hinglish", "hindi", "english"] = "hinglish"
+    language: Language = "hinglish"
     trick_id: str = ""
     estimated_seconds: int = 0
     works_when: str = ""

@@ -45,6 +45,7 @@ VOICE_PROVIDER = os.getenv("VOICE_PROVIDER") or (
 MEDIA_DIR = Path(os.getenv("MEDIA_DIR", "./media"))
 PUBLIC_BASE = os.getenv("PUBLIC_BASE_URL", "http://localhost:8003").rstrip("/")
 MOCK_SECONDS_PER_CHAR = 0.065
+CACHE_MAX_MB = float(os.getenv("VOICE_CACHE_MAX_MB", "500"))  # evict oldest cache files past this
 
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="ExamTricks voice", version="0.1.0")
@@ -111,6 +112,26 @@ def health() -> dict:
     return {"status": "ok", "service": "voice", "provider": VOICE_PROVIDER, "mock": VOICE_PROVIDER == "mock"}
 
 
+def _evict_old_cache_files() -> None:
+    """Dedup caching (same text+voice -> reuse the file) is worth keeping — it's what makes a
+    repeated trick free the second time — but the cache can't grow forever on a metered disk.
+    Delete the oldest-accessed files first once the media dir passes CACHE_MAX_MB; cheap enough
+    to run after every fresh synthesis since it's a no-op scan once under the cap."""
+    files = list(MEDIA_DIR.glob("*"))
+    total = sum(f.stat().st_size for f in files)
+    if total <= CACHE_MAX_MB * 1024 * 1024:
+        return
+    for f in sorted(files, key=lambda p: p.stat().st_atime):
+        if total <= CACHE_MAX_MB * 1024 * 1024:
+            break
+        try:
+            size = f.stat().st_size
+            f.unlink()
+            total -= size
+        except OSError:
+            continue
+
+
 async def _synthesize_sarvam(text: str, speaker: str | None = None, language: str | None = None,
                              pace: float | None = None) -> TtsResponse:
     speaker, language = speaker or SARVAM_SPEAKER, language or SARVAM_LANGUAGE
@@ -134,6 +155,7 @@ async def _synthesize_sarvam(text: str, speaker: str | None = None, language: st
         sarvam_save(response, str(wav_path))
         al = _scaled_alignment(text, _wav_duration_seconds(wav_path))
         meta.write_text(al.model_dump_json())
+        _evict_old_cache_files()
     return TtsResponse(
         audio_url=f"{PUBLIC_BASE}/media/{key}.wav", alignment=al,
         duration_ms=int((al.end[-1] if al.end else 0) * 1000), mock=False,
@@ -164,6 +186,7 @@ async def _synthesize_elevenlabs(text: str, voice_id: str | None = None) -> TtsR
             end=a.get("character_end_times_seconds", []),
         )
         meta.write_text(al.model_dump_json())
+        _evict_old_cache_files()
     return TtsResponse(
         audio_url=f"{PUBLIC_BASE}/media/{key}.mp3", alignment=al,
         duration_ms=int((al.end[-1] if al.end else 0) * 1000), mock=False,

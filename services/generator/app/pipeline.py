@@ -17,7 +17,9 @@ from typing import Any, AsyncIterator
 import httpx
 from anthropic import AsyncAnthropic
 
-from lessonkit import Action, KnowledgeBase, LessonBundle, LessonScript, LessonStep, Question, Teacher
+from lessonkit import (
+    Action, KnowledgeBase, LANGUAGE_TO_SARVAM, LessonBundle, LessonScript, LessonStep, Question, Teacher,
+)
 
 from .prompts import STREAM_SYSTEM_PROMPT, SUBMIT_TOOL, SYSTEM_PROMPT
 
@@ -71,10 +73,14 @@ def _voice_payload(lesson: LessonScript, teacher: Teacher | None) -> dict:
     # voice_* names (not speaker/language/pace): LessonScript already has its own `language`
     # field (narration style), so reusing that name on the wire would shadow it on the voice
     # service's side — see the matching comment in services/voice/app/main.py.
+    # voice_language always comes from the LESSON's own language (the student's choice), not the
+    # teacher's stored default — the same teacher persona can narrate in whichever language the
+    # student picked. Only speaker/pace (voice identity/speed) come from the teacher.
     payload = lesson.model_dump(mode="json")
+    payload["voice_language"] = LANGUAGE_TO_SARVAM.get(lesson.language, "hi-IN")
     if teacher:
-        payload.update(voice_speaker=teacher.sarvam_speaker, voice_language=teacher.sarvam_language,
-                       voice_pace=teacher.sarvam_pace)
+        payload["voice_speaker"] = teacher.sarvam_speaker
+        payload["voice_pace"] = teacher.sarvam_pace
     return payload
 
 

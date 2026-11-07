@@ -18,7 +18,7 @@ import httpx
 from anthropic import AsyncAnthropic
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-from lessonkit import Action, LessonStep, Teacher
+from lessonkit import Action, LANGUAGE_TO_SARVAM, LessonStep, Teacher
 
 from .prompts import DOUBT_SYSTEM
 
@@ -137,10 +137,12 @@ async def check_step(http: httpx.AsyncClient, raw: dict) -> tuple[bool, str]:
         return False, "verifier unavailable"
 
 
-async def voice_step(http: httpx.AsyncClient, step: LessonStep, teacher: Teacher | None) -> LessonStep:
-    payload = {"text": step.say}
+async def voice_step(http: httpx.AsyncClient, step: LessonStep, teacher: Teacher | None, sarvam_lang: str) -> LessonStep:
+    # language always comes from the student's requested narration language, not the teacher's
+    # stored default — see the matching comment in generator/app/pipeline.py's _voice_payload.
+    payload = {"text": step.say, "language": sarvam_lang}
     if teacher:
-        payload.update(speaker=teacher.sarvam_speaker, language=teacher.sarvam_language, pace=teacher.sarvam_pace)
+        payload.update(speaker=teacher.sarvam_speaker, pace=teacher.sarvam_pace)
     try:
         r = await http.post(f"{VOICE_URL}/tts", json=payload, timeout=60)
         if r.status_code == 200:
@@ -153,6 +155,7 @@ async def voice_step(http: httpx.AsyncClient, step: LessonStep, teacher: Teacher
 
 async def answer_doubt(ws: WebSocket, msg: dict) -> None:
     teacher = await resolve_teacher(msg.get("teacher_id"))
+    sarvam_lang = LANGUAGE_TO_SARVAM.get(msg.get("language", "hinglish"), "hi-IN")
     async with httpx.AsyncClient() as http:
         feedback = ""
         for attempt in (1, 2):  # one retry if a step fails verification
@@ -173,7 +176,7 @@ async def answer_doubt(ws: WebSocket, msg: dict) -> None:
                         step = LessonStep(
                             id=f"d{n}", say=str(raw["say"])[:400], pause_ms=int(raw.get("pause_ms", 300)),
                             actions=[a for a in _actions(raw.get("actions", []))])
-                        await queue.put(asyncio.create_task(voice_step(http, step, teacher)))
+                        await queue.put(asyncio.create_task(voice_step(http, step, teacher, sarvam_lang)))
                         if n >= MAX_STEPS:
                             return
                 finally:
