@@ -18,6 +18,7 @@ services:
     environment:
       VERIFIER_URL: "http://verifier:8002"
       VOICE_URL: "http://voice:8003"
+      GATEWAY_URL: "http://gateway:8000"   # resolves teacher_id -> voice settings; optional, falls back to env voice defaults
     depends_on: [verifier, voice]
 
   verifier:
@@ -38,6 +39,7 @@ services:
     environment:
       VERIFIER_URL: "http://verifier:8002"
       VOICE_URL: "http://voice:8003"
+      GATEWAY_URL: "http://gateway:8000"   # resolves teacher_id -> voice settings; optional, falls back to env voice defaults
     ports: ["8004:8004"]          # websocket for raise-hand
     depends_on: [verifier, voice]
 

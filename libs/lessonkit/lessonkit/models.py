@@ -58,3 +58,15 @@ class LessonBundle(BaseModel):
     """One question plus all of its verified trick lessons."""
     question: Question
     lessons: list[LessonScript]
+
+
+class Teacher(BaseModel):
+    """A selectable AI teacher persona: identity + voice. The 3D avatar model is a client-side
+    asset, keyed by avatar_model, not something this service ships."""
+    id: str
+    name: str
+    gender: Literal["male", "female"] = "male"
+    sarvam_speaker: str
+    sarvam_language: str = "hi-IN"
+    sarvam_pace: float = 0.8
+    avatar_model: str = ""

@@ -10,3 +10,7 @@ __pycache__/
 # local runtime media (regenerated audio, never committed)
 media/
 .DS_Store
+
+# This repo is public; the trick knowledge base is the product's actual teaching logic and stays
+# local-only + deployed straight to Railway, never pushed to a public remote.
+knowledge/tricks/

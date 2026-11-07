@@ -17,6 +17,7 @@ class GenerateRequest(BaseModel):
     subject: str | None = None
     language: str = "hinglish"
     with_voice: bool = True
+    teacher_id: str | None = None  # resolved against the gateway's /v1/teachers; falls back to env defaults
 
 
 class GenerateResponse(BaseModel):
@@ -42,7 +43,7 @@ def tricks(subject: str | None = None) -> list[dict]:
 async def generate(req: GenerateRequest) -> GenerateResponse:
     try:
         bundle, report = await pipeline.generate(
-            req.text, req.options, req.exam, req.subject, req.language, req.with_voice)
+            req.text, req.options, req.exam, req.subject, req.language, req.with_voice, req.teacher_id)
     except RuntimeError as exc:
         raise HTTPException(422, str(exc)) from exc
     return GenerateResponse(bundle=bundle, report=report)
@@ -63,7 +64,7 @@ async def ws_generate(ws: WebSocket) -> None:
                 continue
             async for event in pipeline.generate_stream(
                 msg["text"], msg.get("options", []), msg.get("exam", ""), msg.get("subject"),
-                msg.get("language", "hinglish"),
+                msg.get("language", "hinglish"), msg.get("teacher_id"),
             ):
                 await ws.send_json(event)
     except WebSocketDisconnect:

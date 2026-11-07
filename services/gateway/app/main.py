@@ -15,14 +15,16 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from lessonkit import LessonBundle
+from lessonkit import LessonBundle, Teacher
 
 API_KEY = os.getenv("API_KEY", "")  # empty = open (development only)
 GENERATOR_URL = os.getenv("GENERATOR_URL", "http://generator:8001")
 DATA_DIR = Path(os.getenv("DATA_DIR", "./data/bundles"))
 SEED_DIR = Path(os.getenv("SEED_DIR", "/sample/bundles"))
+TEACHERS_DIR = Path(os.getenv("TEACHERS_DIR", "./data/teachers"))
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+TEACHERS_DIR.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="ExamTricks gateway", version="0.1.0")
 # Browser-based teacher templates (web/) fetch this cross-origin; the Android app doesn't need
 # this (CORS is a browser-only mechanism), but without it every fetch() from a page fails.
@@ -63,6 +65,47 @@ class Store:
 
 
 store = Store(DATA_DIR, SEED_DIR)
+
+
+class TeacherStore:
+    """Teacher personas (identity + Sarvam voice) — editable at runtime via the API below, so
+    adding a teacher or re-tuning a voice never needs a redeploy."""
+    def __init__(self, root: Path):
+        self.root = root
+        if not any(root.glob("*.json")):  # first boot: seed the one teacher every lesson used before this existed
+            self.put(Teacher(id="default", name="Sir", gender="male", sarvam_speaker="varun",
+                             sarvam_language="hi-IN", sarvam_pace=0.8))
+
+    def get(self, tid: str) -> Teacher | None:
+        if not _ID.match(tid):
+            return None
+        path = self.root / f"{tid}.json"
+        return Teacher(**json.loads(path.read_text(encoding="utf-8"))) if path.exists() else None
+
+    def put(self, teacher: Teacher) -> None:
+        (self.root / f"{teacher.id}.json").write_text(teacher.model_dump_json(), encoding="utf-8")
+
+    def list(self) -> list[Teacher]:
+        return [Teacher(**json.loads(f.read_text(encoding="utf-8"))) for f in sorted(self.root.glob("*.json"))]
+
+    def delete(self, tid: str) -> bool:
+        path = self.root / f"{tid}.json" if _ID.match(tid) else None
+        if path and path.exists():
+            path.unlink()
+            return True
+        return False
+
+
+teachers = TeacherStore(TEACHERS_DIR)
+
+
+class TeacherIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+    gender: str = "male"
+    sarvam_speaker: str = Field(..., min_length=1)
+    sarvam_language: str = "hi-IN"
+    sarvam_pace: float = 0.8
+    avatar_model: str = ""
 
 
 class SolveRequest(BaseModel):
@@ -113,3 +156,36 @@ async def tricks(subject: str | None = None) -> list[dict]:
     async with httpx.AsyncClient(timeout=15) as http:
         r = await http.get(f"{GENERATOR_URL}/tricks", params={"subject": subject} if subject else None)
     return r.json()
+
+
+@app.get("/v1/teachers", dependencies=[Depends(auth)])
+def list_teachers(response: Response) -> list[Teacher]:
+    response.headers["Cache-Control"] = "no-store"
+    return teachers.list()
+
+
+@app.get("/v1/teachers/{tid}", dependencies=[Depends(auth)])
+def get_teacher(tid: str, response: Response) -> Teacher:
+    response.headers["Cache-Control"] = "no-store"
+    teacher = teachers.get(tid)
+    if teacher is None:
+        raise HTTPException(404, "teacher not found")
+    return teacher
+
+
+@app.put("/v1/teachers/{tid}", response_model=Teacher, dependencies=[Depends(auth)])
+def upsert_teacher(tid: str, req: TeacherIn) -> Teacher:
+    if not _ID.match(tid):
+        raise HTTPException(422, "teacher id must be 3-64 chars of letters, digits, _ or -")
+    teacher = Teacher(id=tid, **req.model_dump())
+    teachers.put(teacher)
+    return teacher
+
+
+@app.delete("/v1/teachers/{tid}", dependencies=[Depends(auth)])
+def delete_teacher(tid: str) -> dict:
+    if tid == "default":
+        raise HTTPException(400, "cannot delete the default teacher")
+    if not teachers.delete(tid):
+        raise HTTPException(404, "teacher not found")
+    return {"status": "deleted"}

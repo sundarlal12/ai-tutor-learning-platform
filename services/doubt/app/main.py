@@ -11,13 +11,14 @@ import asyncio
 import json
 import logging
 import os
+import time
 from typing import AsyncIterator
 
 import httpx
 from anthropic import AsyncAnthropic
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-from lessonkit import Action, LessonStep
+from lessonkit import Action, LessonStep, Teacher
 
 from .prompts import DOUBT_SYSTEM
 
@@ -28,10 +29,35 @@ FAST_MODEL = os.getenv("DOUBT_FAST_MODEL", "claude-haiku-5-5")
 STRONG_MODEL = os.getenv("DOUBT_STRONG_MODEL", "claude-sonnet-5-5")
 VERIFIER_URL = os.getenv("VERIFIER_URL", "http://verifier:8002")
 VOICE_URL = os.getenv("VOICE_URL", "http://voice:8003")
+GATEWAY_URL = os.getenv("GATEWAY_URL", "http://gateway:8000")  # for resolving teacher_id -> voice settings
 MAX_STEPS = 6
 MAX_DOUBT_CHARS = 500
 
 _client = AsyncAnthropic() if os.getenv("ANTHROPIC_API_KEY") else None
+_teacher_cache: dict[str, tuple[float, Teacher | None]] = {}
+_TEACHER_CACHE_TTL = 60.0
+
+
+async def resolve_teacher(teacher_id: str | None) -> Teacher | None:
+    """Same per-teacher voice lookup as the generator service — kept local rather than shared
+    since each service's gateway client setup is already self-contained. None (no id given, or
+    the gateway lookup failed) just means the voice service falls back to its own env defaults."""
+    if not teacher_id:
+        return None
+    now = time.monotonic()
+    cached = _teacher_cache.get(teacher_id)
+    if cached and now - cached[0] < _TEACHER_CACHE_TTL:
+        return cached[1]
+    teacher: Teacher | None = None
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            r = await http.get(f"{GATEWAY_URL}/v1/teachers/{teacher_id}")
+            if r.status_code == 200:
+                teacher = Teacher(**r.json())
+    except Exception:  # noqa: BLE001 - unresolved teacher: fall back to env defaults, don't fail the doubt
+        log.warning("could not resolve teacher_id=%s from gateway", teacher_id)
+    _teacher_cache[teacher_id] = (now, teacher)
+    return teacher
 
 
 @app.get("/health")
@@ -111,9 +137,12 @@ async def check_step(http: httpx.AsyncClient, raw: dict) -> tuple[bool, str]:
         return False, "verifier unavailable"
 
 
-async def voice_step(http: httpx.AsyncClient, step: LessonStep) -> LessonStep:
+async def voice_step(http: httpx.AsyncClient, step: LessonStep, teacher: Teacher | None) -> LessonStep:
+    payload = {"text": step.say}
+    if teacher:
+        payload.update(speaker=teacher.sarvam_speaker, language=teacher.sarvam_language, pace=teacher.sarvam_pace)
     try:
-        r = await http.post(f"{VOICE_URL}/tts", json={"text": step.say}, timeout=60)
+        r = await http.post(f"{VOICE_URL}/tts", json=payload, timeout=60)
         if r.status_code == 200:
             data = r.json()
             step.audio_url, step.alignment = data["audio_url"], data["alignment"]
@@ -123,6 +152,7 @@ async def voice_step(http: httpx.AsyncClient, step: LessonStep) -> LessonStep:
 
 
 async def answer_doubt(ws: WebSocket, msg: dict) -> None:
+    teacher = await resolve_teacher(msg.get("teacher_id"))
     async with httpx.AsyncClient() as http:
         feedback = ""
         for attempt in (1, 2):  # one retry if a step fails verification
@@ -143,7 +173,7 @@ async def answer_doubt(ws: WebSocket, msg: dict) -> None:
                         step = LessonStep(
                             id=f"d{n}", say=str(raw["say"])[:400], pause_ms=int(raw.get("pause_ms", 300)),
                             actions=[a for a in _actions(raw.get("actions", []))])
-                        await queue.put(asyncio.create_task(voice_step(http, step)))
+                        await queue.put(asyncio.create_task(voice_step(http, step, teacher)))
                         if n >= MAX_STEPS:
                             return
                 finally:

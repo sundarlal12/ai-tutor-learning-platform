@@ -10,13 +10,14 @@ import hashlib
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any, AsyncIterator
 
 import httpx
 from anthropic import AsyncAnthropic
 
-from lessonkit import Action, KnowledgeBase, LessonBundle, LessonScript, LessonStep, Question
+from lessonkit import Action, KnowledgeBase, LessonBundle, LessonScript, LessonStep, Question, Teacher
 
 from .prompts import STREAM_SYSTEM_PROMPT, SUBMIT_TOOL, SYSTEM_PROMPT
 
@@ -25,12 +26,15 @@ log = logging.getLogger("generator")
 MODEL = os.getenv("GENERATOR_MODEL", "claude-sonnet-5-5")
 VERIFIER_URL = os.getenv("VERIFIER_URL", "http://verifier:8002")
 VOICE_URL = os.getenv("VOICE_URL", "http://voice:8003")
+GATEWAY_URL = os.getenv("GATEWAY_URL", "http://gateway:8000")  # for resolving teacher_id -> voice settings
 KNOWLEDGE_DIR = os.getenv("KNOWLEDGE_DIR", "/knowledge/tricks")
 SAMPLE_DIR = Path(os.getenv("SAMPLE_DIR", "/sample/bundles"))
 GATEWAY_DATA_DIR = os.getenv("GATEWAY_DATA_DIR", "")  # when set, cache finished live-solved bundles here too
 
 kb = KnowledgeBase.load(KNOWLEDGE_DIR) if Path(KNOWLEDGE_DIR).exists() else KnowledgeBase([])
 _client: AsyncAnthropic | None = None
+_teacher_cache: dict[str, tuple[float, Teacher | None]] = {}
+_TEACHER_CACHE_TTL = 60.0
 
 
 def anthropic_client() -> AsyncAnthropic | None:
@@ -38,6 +42,36 @@ def anthropic_client() -> AsyncAnthropic | None:
     if _client is None and os.getenv("ANTHROPIC_API_KEY"):
         _client = AsyncAnthropic()
     return _client
+
+
+async def _resolve_teacher(teacher_id: str | None) -> Teacher | None:
+    """Looks up a teacher's voice (gateway's /v1/teachers) so speaker/language/pace come from
+    per-teacher config instead of this service's own env vars. None (lookup skipped or failed)
+    just means the voice service falls back to its SARVAM_* env defaults, same as before teachers
+    existed at all."""
+    if not teacher_id:
+        return None
+    now = time.monotonic()
+    cached = _teacher_cache.get(teacher_id)
+    if cached and now - cached[0] < _TEACHER_CACHE_TTL:
+        return cached[1]
+    teacher: Teacher | None = None
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            r = await http.get(f"{GATEWAY_URL}/v1/teachers/{teacher_id}")
+            if r.status_code == 200:
+                teacher = Teacher(**r.json())
+    except Exception:  # noqa: BLE001 - unresolved teacher: fall back to env defaults, don't fail the lesson
+        log.warning("could not resolve teacher_id=%s from gateway", teacher_id)
+    _teacher_cache[teacher_id] = (now, teacher)
+    return teacher
+
+
+def _voice_payload(lesson: LessonScript, teacher: Teacher | None) -> dict:
+    payload = lesson.model_dump(mode="json")
+    if teacher:
+        payload.update(speaker=teacher.sarvam_speaker, language=teacher.sarvam_language, pace=teacher.sarvam_pace)
+    return payload
 
 
 def question_id(text: str) -> str:
@@ -79,8 +113,8 @@ async def _sample_fallback(text: str) -> LessonBundle | None:
     return None
 
 
-async def generate(text: str, options: list[str], exam: str, subject: str | None,
-                   language: str, with_voice: bool) -> tuple[LessonBundle, list[dict]]:
+async def generate(text: str, options: list[str], exam: str, subject: str | None, language: str,
+                   with_voice: bool, teacher_id: str | None = None) -> tuple[LessonBundle, list[dict]]:
     client = anthropic_client()
     if client is None:
         sample = await _sample_fallback(text)
@@ -134,9 +168,11 @@ async def generate(text: str, options: list[str], exam: str, subject: str | None
     lessons.sort(key=lambda l: l.estimated_seconds or 999)
 
     if with_voice:
+        teacher = await _resolve_teacher(teacher_id)
         async with httpx.AsyncClient(timeout=120) as http:
-            voiced = await asyncio.gather(*[http.post(f"{VOICE_URL}/lesson", json=l.model_dump(mode="json")) for l in lessons],
-                                          return_exceptions=True)
+            voiced = await asyncio.gather(
+                *[http.post(f"{VOICE_URL}/lesson", json=_voice_payload(l, teacher)) for l in lessons],
+                return_exceptions=True)
         for i, v in enumerate(voiced):
             if isinstance(v, httpx.Response) and v.status_code == 200:
                 lessons[i] = LessonScript(**v.json())
@@ -173,7 +209,7 @@ async def _claude_ndjson_lines(system: str, user: str) -> AsyncIterator[dict]:
 
 
 async def generate_stream(text: str, options: list[str], exam: str, subject: str | None,
-                          language: str) -> AsyncIterator[dict]:
+                          language: str, teacher_id: str | None = None) -> AsyncIterator[dict]:
     """Same pipeline as generate(), but yields a {"type":"question"} event as soon as the ground
     truth is verified, then one {"type":"lesson"} event per trick as it finishes generation +
     verification + voice — so the fastest trick can start playing while slower ones are still
@@ -195,6 +231,7 @@ async def generate_stream(text: str, options: list[str], exam: str, subject: str
     system = STREAM_SYSTEM_PROMPT.format(language=language, knowledge="\n".join(t.to_prompt() for t in tricks) or "(none matched)")
     user = f"Exam: {exam or 'general'}\nQuestion: {text}\nOptions: {'; '.join(options) if options else '(none)'}"
 
+    teacher = await _resolve_teacher(teacher_id)
     truth: dict[str, Any] | None = None
     lessons: list[LessonScript] = []
     async with httpx.AsyncClient(timeout=30) as http:
@@ -227,7 +264,7 @@ async def generate_stream(text: str, options: list[str], exam: str, subject: str
                                       estimated_seconds=int(raw.get("estimated_seconds", 0)),
                                       works_when=raw.get("works_when", ""), answer=truth["final_answer"], steps=steps)
                 try:
-                    r = await http.post(f"{VOICE_URL}/lesson", json=lesson.model_dump(mode="json"), timeout=120)
+                    r = await http.post(f"{VOICE_URL}/lesson", json=_voice_payload(lesson, teacher), timeout=120)
                     if r.status_code == 200:
                         lesson = LessonScript(**r.json())
                     else:

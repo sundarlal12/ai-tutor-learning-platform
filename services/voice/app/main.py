@@ -68,6 +68,11 @@ async def fix_wav_content_type(request, call_next):
 class TtsRequest(BaseModel):
     text: str
     voice_id: str | None = None
+    # Per-teacher voice override (resolved by the caller from gateway's /v1/teachers) — falls
+    # back to the SARVAM_* env vars above when not given, so existing callers need no changes.
+    speaker: str | None = None
+    language: str | None = None
+    pace: float | None = None
 
 
 class TtsResponse(BaseModel):
@@ -106,8 +111,11 @@ def health() -> dict:
     return {"status": "ok", "service": "voice", "provider": VOICE_PROVIDER, "mock": VOICE_PROVIDER == "mock"}
 
 
-async def _synthesize_sarvam(text: str) -> TtsResponse:
-    key = hashlib.sha256(f"sarvam|{SARVAM_MODEL}|{SARVAM_SPEAKER}|{SARVAM_LANGUAGE}|{SARVAM_PACE}|{text}".encode()).hexdigest()[:32]
+async def _synthesize_sarvam(text: str, speaker: str | None = None, language: str | None = None,
+                             pace: float | None = None) -> TtsResponse:
+    speaker, language = speaker or SARVAM_SPEAKER, language or SARVAM_LANGUAGE
+    pace = SARVAM_PACE if pace is None else pace
+    key = hashlib.sha256(f"sarvam|{SARVAM_MODEL}|{speaker}|{language}|{pace}|{text}".encode()).hexdigest()[:32]
     wav_path, meta = MEDIA_DIR / f"{key}.wav", MEDIA_DIR / f"{key}.json"
     if wav_path.exists() and meta.exists():  # cache hit: no provider cost, no latency
         al = Alignment(**json.loads(meta.read_text()))
@@ -118,8 +126,7 @@ async def _synthesize_sarvam(text: str) -> TtsResponse:
                 response = await loop.run_in_executor(
                     None,
                     lambda: _sarvam_client.text_to_speech.convert(
-                        text=text, language_code=SARVAM_LANGUAGE, model=SARVAM_MODEL, speaker=SARVAM_SPEAKER,
-                        pace=SARVAM_PACE,
+                        text=text, language_code=language, model=SARVAM_MODEL, speaker=speaker, pace=pace,
                     ),
                 )
             except Exception as e:  # noqa: BLE001 - surface the provider's own message
@@ -163,12 +170,13 @@ async def _synthesize_elevenlabs(text: str, voice_id: str | None = None) -> TtsR
     )
 
 
-async def synthesize(text: str, voice_id: str | None = None) -> TtsResponse:
+async def synthesize(text: str, voice_id: str | None = None, speaker: str | None = None,
+                     language: str | None = None, pace: float | None = None) -> TtsResponse:
     text = text.strip()
     if not text:
         raise HTTPException(400, "empty text")
     if VOICE_PROVIDER == "sarvam":
-        return await _synthesize_sarvam(text)
+        return await _synthesize_sarvam(text, speaker, language, pace)
     if VOICE_PROVIDER == "elevenlabs":
         return await _synthesize_elevenlabs(text, voice_id)
     al = _mock_alignment(text)
@@ -177,13 +185,21 @@ async def synthesize(text: str, voice_id: str | None = None) -> TtsResponse:
 
 @app.post("/tts", response_model=TtsResponse)
 async def tts(req: TtsRequest) -> TtsResponse:
-    return await synthesize(req.text, req.voice_id)
+    return await synthesize(req.text, req.voice_id, req.speaker, req.language, req.pace)
+
+
+class VoiceLessonRequest(LessonScript):
+    speaker: str | None = None
+    language: str | None = None
+    pace: float | None = None
 
 
 @app.post("/lesson", response_model=LessonScript)
-async def voice_lesson(lesson: LessonScript) -> LessonScript:
+async def voice_lesson(req: VoiceLessonRequest) -> LessonScript:
     """Adds audio_url + alignment to every step of a lesson (steps are synthesised in parallel)."""
-    results = await asyncio.gather(*[synthesize(s.say) for s in lesson.steps])
+    results = await asyncio.gather(
+        *[synthesize(s.say, speaker=req.speaker, language=req.language, pace=req.pace) for s in req.steps])
+    lesson = LessonScript(**req.model_dump(exclude={"speaker", "language", "pace"}))
     for step, res in zip(lesson.steps, results):
         step.audio_url, step.alignment = res.audio_url, res.alignment
     return lesson
