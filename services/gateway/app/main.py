@@ -127,6 +127,16 @@ def list_questions(response: Response, subject: str | None = None) -> list[dict]
     return [q for q in store.list() if not subject or q["subject"] == subject]
 
 
+@app.put("/v1/questions/{qid}/bundle", response_model=LessonBundle, dependencies=[Depends(auth)])
+def put_bundle(qid: str, bundle: LessonBundle) -> LessonBundle:
+    """Admin-style upsert: push a pre-built bundle straight into the store, e.g. to re-seed a
+    sample bundle whose audio was synthesised against a different voice-service host."""
+    if bundle.question.id != qid:
+        raise HTTPException(422, "bundle.question.id must match the URL's qid")
+    store.put(bundle)
+    return bundle
+
+
 @app.get("/v1/questions/{qid}/bundle", response_model=LessonBundle, dependencies=[Depends(auth)])
 def get_bundle(qid: str, response: Response) -> LessonBundle:
     response.headers["Cache-Control"] = "no-store"
