@@ -4,10 +4,16 @@ Backend-only split of the ExamTricks project: the five FastAPI services that sol
 questions with Claude, verify every trick with SymPy, voice it with Sarvam, and stream both the
 live solve and "raise hand" doubts to the Android app over WebSocket.
 
+This repo is public; `knowledge/tricks/*.yaml` — the actual trick content the generator teaches
+from — is deliberately gitignored and deployed straight to Railway from local instead, so the
+product's teaching logic isn't sitting in a public repo. `generator`'s `KNOWLEDGE_DIR` just needs
+that folder present wherever it runs; see `knowledge/tricks/` in this repo's working copy if
+you're setting up a new deploy target.
+
 ## Layout
 | Path | What |
 |---|---|
-| `knowledge/tricks/*.yaml` | Trick recipes (identity, substitution, option-elimination, ...) with a machine-checkable `proof` |
+| `knowledge/tricks/*.yaml` | Trick recipes (identity, substitution, option-elimination, ...) with a machine-checkable `proof` — **not in this public repo**, see note above |
 | `libs/lessonkit` | Shared models, YAML knowledge base + retrieval, SymPy proof checker |
 | `services/gateway` :8100 | App-facing REST API — question list / bundle / solve, file-backed cache |
 | `services/generator` :8101 | Claude → verified lesson scripts. `/generate` (batch) and `/ws/generate` (live NDJSON stream — fastest trick first) |
