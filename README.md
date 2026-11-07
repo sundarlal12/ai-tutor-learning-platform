@@ -30,6 +30,24 @@ python3 tools/validate_tricks.py          # checks YAML + runs every proof
 ```
 Without keys the services run in **mock mode** (sample lessons from `sample/bundles`, no Claude/Sarvam calls).
 
+## Teachers (multiple voices/personas)
+`gateway` owns the list of teachers (name, gender, Sarvam speaker/language/pace, avatar model) as
+simple CRUD, backed by local JSON files like the bundle cache — no redeploy needed to add a
+teacher or retune a voice:
+```bash
+curl $GATEWAY/v1/teachers                                    # list
+curl -X PUT $GATEWAY/v1/teachers/priya -d '{"name":"Priya Ma'"'"'am","gender":"female","sarvam_speaker":"priya","sarvam_language":"hi-IN","sarvam_pace":0.85}'
+```
+Pass `teacher_id` in a `/generate`, `/ws/generate`, or `/ws/doubt` request and `generator`/`doubt`
+resolve it against `gateway` (cached 60s) and forward the matching `speaker`/`language`/`pace` to
+`voice`. Omit it and everything falls back to `voice`'s own `SARVAM_*` env vars, exactly as before
+teachers existed — a `default` teacher is auto-seeded on first boot so nothing breaks either way.
+A full Sarvam `bulbul:v3` speaker list is in that model's own error message if `sarvam_speaker`
+is ever mistyped; valid values as of this writing: aditya, ritu, ashutosh, priya, neha, rahul,
+pooja, rohan, simran, kavya, amit, dev, ishita, shreya, ratan, varun, manan, sumit, roopa, kabir,
+aayan, shubh, advait, anand, tanya, tarun, sunny, mani, gokul, vijay, shruti, suhani, mohit,
+kavitha, rehan, soham, rupali.
+
 ## ⚠️ Why this is NOT a Vercel deploy as-is
 Two of these five services only work over a **persistent WebSocket** (`doubt` and `generator`'s
 `/ws/generate` — this is what makes the live solve + raise-hand-doubt features in the Android app
